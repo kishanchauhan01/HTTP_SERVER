@@ -219,10 +219,9 @@ struct sockaddr_in {
 ### The "Magic" of Memory Layout
 
 - Notice that both structures start with the exact same data type: family.
+    - When you pass `sockaddr_in` cast as `sockaddr`, the system looks at the first 2 bytes (`family`).
 
-	- When you pass `sockaddr_in` cast as `sockaddr`, the system looks at the first 2 bytes (`family`).
-
-	- If it sees `AF_INET`, it knows, "Ah, the rest of this data is actually organized as a sockaddr_in," and it reads the port and IP correctly.
+    - If it sees `AF_INET`, it knows, "Ah, the rest of this data is actually organized as a sockaddr_in," and it reads the port and IP correctly.
 
 The Casting Syntax: This is why you see this cast in every network program:
 
@@ -249,43 +248,37 @@ int socket(int domain, int type, int protocol);
 ### 1) domain (The Family)
 
 - This tells the system which protocol family (or address family) you want to use. It defines the format of the addresses.
+    - `AF_INET`: IPv4 (Internet Protocol v4). This is the most common (e.g., 192.168.1.1).
 
-	- `AF_INET`: IPv4 (Internet Protocol v4). This is the most common (e.g., 192.168.1.1).
+    - `AF_INET6`: IPv6 (Internet Protocol v6). The modern standard (e.g., 2001:0db8::).
 
-	- `AF_INET6`: IPv6 (Internet Protocol v6). The modern standard (e.g., 2001:0db8::).
+    - `AF_UNIX` (or `AF_LOCAL`): `Local communication` on the same machine (Unix Domain Sockets). Used for efficient process-to-process talk without using the network card.
 
-	- `AF_UNIX` (or `AF_LOCAL`): `Local communication` on the same machine (Unix Domain Sockets). Used for efficient process-to-process talk without using the network card.
-
-- Note: "AF" stands for `Address Family`. You might sometimes see "PF" (`Protocol Family`), like PF_INET. In modern code, AF_INET and PF_INET are practically interchangeable, but `AF_` is preferred for the domain argument.
+- Note: "AF" stands for `Address Family`. You might sometimes see "PF" (`Protocol Family`), like PF*INET. In modern code, AF_INET and PF_INET are practically interchangeable, but `AF*` is preferred for the domain argument.
 
 ### 2) type (The Style of Communication)
 
 - This determines how `data is transferred`.
+    - `SOCK_STREAM` (TCP): Provides a sequenced, reliable, two-way, connection-based byte stream.
 
-	- `SOCK_STREAM` (TCP): Provides a sequenced, reliable, two-way, connection-based byte stream.
+    - `SOCK_DGRAM` (UDP): Supports datagrams (connectionless, unreliable messages of a fixed maximum length).
 
-	- `SOCK_DGRAM` (UDP): Supports datagrams (connectionless, unreliable messages of a fixed maximum length).
-
-	- `SOCK_RAW`: Provides raw network protocol access (used for advanced things like ping tools or sniffing).
+    - `SOCK_RAW`: Provides raw network protocol access (used for advanced things like ping tools or sniffing).
 
 ### 3) protocol ( The Specific Protocol)
 
 - This specifies a particular protocol to be used with the socket.
+    - Usually `0`: In 99% of cases, you set this to `0`. This tells the system to "choose the `default protocol` for the given domain and type."
+        - If you choose AF_INET + SOCK_STREAM, the system knows you mean `TCP`.
 
-	- Usually `0`: In 99% of cases, you set this to `0`. This tells the system to "choose the `default protocol` for the given domain and type."
+        - If you choose AF_INET + SOCK_DGRAM, the system knows you mean `UDP`.
 
-		- If you choose AF_INET + SOCK_STREAM, the system knows you mean `TCP`.
-
-		- If you choose AF_INET + SOCK_DGRAM, the system knows you mean `UDP`.
-
-	- Explicit values: You can explicitly pass `IPPROTO_TCP` or `IPPROTO_UDP`, but it is rarely necessary unless you are using a non-standard protocol combination.
+    - Explicit values: You can explicitly pass `IPPROTO_TCP` or `IPPROTO_UDP`, but it is rarely necessary unless you are using a non-standard protocol combination.
 
 - Return Value
+    - `Success`: Returns a `non-negative` integer (the File Descriptor). You store this in a variable (usually named `sockfd` or `listenfd`).
 
-	- `Success`: Returns a `non-negative` integer (the File Descriptor). You store this in a variable (usually named `sockfd` or `listenfd`).
-
-	- `Error`: Returns `-1`. The specific error code is stored in the global variable `errno` (e.g., `EACCES` if you don't have permission).
-
+    - `Error`: Returns `-1`. The specific error code is stored in the global variable `errno` (e.g., `EACCES` if you don't have permission).
 
 ## 🥗 bind()—What port am I on?
 
@@ -303,30 +296,26 @@ int bind(int sockfd, struct sockaddr *my_addr, int addrlen);
 - `What it does`
 
 - It associates the socket (which currently just exists as a file descriptor) with a specific Local IP `Address` and `Local Port Number` on your machine.
+    - `Servers` use this so clients know where to find them (e.g., "Listen on Port 80").
 
-	- `Servers` use this so clients know where to find them (e.g., "Listen on Port 80").
-
-	- `Clients` usually skip this. The OS will automatically assign them a random unused port when they try to connect.
+    - `Clients` usually skip this. The OS will automatically assign them a random unused port when they try to connect.
 
 ### The Arguments Breakdown
 
-1) sockfd **`(The Socket)`**
+1. sockfd **`(The Socket)`**
+    - This is the integer File Descriptor you got returned from the `socket()` call. It tells the system which socket you want to configure.
 
-	- This is the integer File Descriptor you got returned from the `socket()` call. It tells the system which socket you want to configure.
+2) my_addr **`(The Address)`**
+    - This is a pointer to the `struct sockaddr` containing the IP and Port you want to lock down.
 
-2. my_addr **`(The Address)`**
+    - `For IP`: You usually use `INADDR_ANY`. This tells the OS, "Bind to all available interfaces." (e.g., if your server has WiFi and Ethernet, listen on both).
 
-	- This is a pointer to the `struct sockaddr` containing the IP and Port you want to lock down.
+    - `For Port`: You specify the port (e.g., 80 for HTTP, 443 for HTTPS, or 3490 for your custom app).
 
-	- `For IP`: You usually use `INADDR_ANY`. This tells the OS, "Bind to all available interfaces." (e.g., if your server has WiFi and Ethernet, listen on both).
+    - `Crucial Note`: As discussed previously, you actually fill out a struct `sockaddr_in` and cast it to struct `sockaddr*` here.
 
-	- `For Port`: You specify the port (e.g., 80 for HTTP, 443 for HTTPS, or 3490 for your custom app).
-
-	- `Crucial Note`: As discussed previously, you actually fill out a struct `sockaddr_in` and cast it to struct `sockaddr*` here.
-
-3. addrlen **`(The Size)`**
-
-	 - The size of the address structure. You simply pass sizeof(**struct sockaddr_in)**. This prevents the kernel from reading too much or too little memory.
+3) addrlen **`(The Size)`**
+    - The size of the address structure. You simply pass sizeof(**struct sockaddr_in)**. This prevents the kernel from reading too much or too little memory.
 
 ### The Return Value
 
@@ -335,7 +324,125 @@ int bind(int sockfd, struct sockaddr *my_addr, int addrlen);
 - `-1`: Error. (Check `errno`).
 
 - **The Most Common Error: "Address already in use"** If you run your server, stop it, and try to restart it immediately, `bind()` often fails with this error.
+    - Why? The OS keeps the port "reserved" for a few seconds after a connection closes to clean up stray packets.
 
-	- Why? The OS keeps the port "reserved" for a few seconds after a connection closes to clean up stray packets.
+    - The Fix: You can use `setsockopt()` to allow reuse of the address (I can show you this if needed).
 
-	- The Fix: You can use `setsockopt()` to allow reuse of the address (I can show you this if needed).
+## 🛜 connect()—Hey, you!
+
+- Let’s just pretend for a few minutes that you’re a telnet application. Your user commands you (just like in the movie TRON) to get a socket file descriptor. You comply and call socket(). Next, the user tells you to connect to “10.12.110.57” on port “23” (the standard telnet port). Yow! What do you do now?
+
+- The `connect()` function is the client-side counterpart to bind(). If socket() creates the telephone, `connect()` is the act of dialing the number to reach a server.
+
+- The Signature
+
+```c
+#include <sys/types.h>
+#include <sys/socket.h>
+
+int connect(int sockfd, struct sockaddr *serv_addr, int addrlen);
+```
+
+- sockfd is our friendly neighborhood socket file descriptor, as returned by the socket() call, serv_addr is a struct sockaddr containing the destination port and IP address, and addrlen is the length in bytes of the server address structure.
+
+- All of this information can be gleaned from the results of the getaddrinfo() call, which rocks.
+
+### The Arguments
+
+1. `sockfd` (The Caller): The file descriptor of your socket (the client's socket) that you created earlier with` socket()`.
+
+2. `serv_addr` (The Destination): A pointer to a `struct sockaddr` containing the IP address and Port of the server you want to talk to.
+    - Note: Even though this argument is called `serv_addr`, you usually fill out a `struct sockaddr_in` (for IPv4) and cast it, just like you did with `bind`.
+
+3. `addrlen` (The Size): The size of the server address structure (`sizeof(struct sockaddr)`).
+
+#### When you call `connect()`, the kernel doesn't just "set a variable." It initiates actual `network traffic`.
+
+**1) The TCP 3-Way Handshake**
+
+- If you are using TCP (SOCK_STREAM), calling connect() triggers the famous "Three-Way Handshake."
+    1.  SYN: Your kernel sends a "Hello, I want to connect" packet (SYN) to the server.
+
+    2.  SYN-ACK: Your kernel blocks (pauses your program) and waits. If the server is listening, it sends back a "Received, let's talk" packet (SYN-ACK).
+
+    3.  ACK: Your kernel sends a final "Okay, connection confirmed" packet (ACK).
+
+- Only after step 3 does the connect() function` return 0` (Success). If step 2 never happens (`timeout`) or the server says "No" (`RST`), the function `returns -1`.
+
+**2. The "Implicit Bind" (Important!)**
+
+- You might notice client code rarely calls `bind()`.
+    - Server: Must use `bind()` because it needs a fixed port (e.g., 80) so people can find it.
+
+    - Client: Doesn't care which port it uses, as long as the connection works.
+
+- When you call `connect()`, if you haven't bound a port yet, the operating system automatically checks your local interfaces and assigns you:
+    1.  A random, unused Ephemeral Port (usually between 1024 and 65535).
+
+    2.  The correct local IP address to reach the destination.
+
+### Return Values & Common Errors
+
+- `0`: Success. The line is open. You can now use `send()` and `recv()` (or `write`/`read`) on the socket.
+
+- `-1`: Error. The global `errno` variable explains why.
+
+**Common Errors:**
+
+1. `ECONNREFUSED` (Connection Refused):
+    - Meaning: You reached the computer, but no program is listening on that specific port.
+
+    - Analogy: You called the house, but nobody picked up.
+
+2. `ETIMEDOUT` (Connection Timed Out):
+    - Meaning: You sent the SYN packet, but got no reply at all. The server might be down, or a firewall is silently dropping your packets.
+
+3. `ENETUNREACH` (Network Unreachable):
+    - Meaning: Your computer doesn't know how to route packets to that IP (e.g., you have no WiFi).
+
+### Code Example: A Simple Client
+
+- Here is how you use it to connect to "localhost" on port 8080.
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+
+int main() {
+    int sockfd;
+    struct sockaddr_in serv_addr;
+
+    // 1. Create the socket
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        perror("Socket creation error");
+        return -1;
+    }
+
+    // 2. Setup the Server Address (Where we want to go)
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(8080); // Destination Port
+
+    // Convert string IP "127.0.0.1" to binary
+    if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0) {
+        perror("Invalid address/ Address not supported");
+        return -1;
+    }
+
+    // 3. CONNECT!
+    // This blocks until the handshake finishes or fails
+    if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+        perror("Connection Failed");
+        return -1;
+    }
+
+    printf("Connected successfully!\n");
+
+    // You can now use send(sockfd, ...) or recv(sockfd, ...)
+    close(sockfd);
+    return 0;
+}
+```
