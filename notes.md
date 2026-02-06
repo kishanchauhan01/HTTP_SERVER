@@ -328,6 +328,48 @@ int bind(int sockfd, struct sockaddr *my_addr, int addrlen);
 
     - The Fix: You can use `setsockopt()` to allow reuse of the address (I can show you this if needed).
 
+### Code example
+
+```c
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <arpa/inet.h>
+#include <stdlib.h>
+#include <netinet/in.h>
+
+int main()
+{
+
+  int sockfd;
+  struct sockaddr_in my_addr;
+
+  // 1. Create the socket
+  sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+  // 2. Prepare the address struct
+  my_addr.sin_family = AF_INET;         // Host byte order
+  my_addr.sin_port = htons(8080);       // Short, network byte order
+  my_addr.sin_addr.s_addr = INADDR_ANY; // Auto-fill with my IP
+  memset(&(my_addr.sin_zero), '\0', 8); // Zero the rest of the struct
+
+  // 3. BIND!
+  // Link the "sockfd" to the information in "my_addr"
+  if (bind(sockfd, (struct sockaddr *)&my_addr, sizeof(struct sockaddr)) == -1)
+  {
+    perror("bind connection error"); // Print error if port 8080 is busy
+    exit(1);
+  }
+
+  // Now the socket is bound to port 8080!
+  // Next steps: listen() -> accept()
+
+  return 0;
+}
+```
+
 ## 🛜 connect()—Hey, you!
 
 - Let’s just pretend for a few minutes that you’re a telnet application. Your user commands you (just like in the movie TRON) to get a socket file descriptor. You comply and call socket(). Next, the user tells you to connect to “10.12.110.57” on port “23” (the standard telnet port). Yow! What do you do now?
@@ -446,3 +488,108 @@ int main() {
     return 0;
 }
 ```
+
+## 👂️ listen()—Will somebody please call me?
+
+- What if you don’t want to connect to a remote host. Say, just for kicks, that you want to wait for incoming connections and handle them in some way. The process is two step: first you `listen()`, then you `accept()`
+
+- The listen() call is fairly simple, but requires a bit of explanation:
+
+```c
+int listen(int sockfd, int backlog);
+```
+
+- sockfd is the usual socket file descriptor from the `socket()` system call. backlog is the number of connections **allowed on the incoming queue**. What does that mean? Well, incoming connections are going to wait in this queue until you `accept()` them and this is the limit on how many can queue up. Most systems silently limit this number to about 20; you can probably get away with setting it to 5 or 10.
+
+- Well, as you can probably imagine, we need to call `bind()` before we call `listen()` so that the server is running on a specific port. (You have to be able to tell your buddies which port to connect to!) So if you’re going to be listening for incoming connections, the sequence of system calls you’ll make is:
+
+```c
+getaddrinfo();
+socket();
+bind();
+listen();
+/* accept() goes here */
+```
+
+### The Arguments
+
+1.  `sockfd` (The Socket)
+    The file descriptor you created with socket() and subsequently bound to a port with bind().
+
+2.  `backlog` (The Queue Size)
+    This is the number of pending connections the operating system will allow to wait in line.
+    - **Scenario**: Imagine your server is busy handling a request (maybe writing to a database). While it is busy, three new clients try to connect at the exact same millisecond.
+
+    - **The Queue**: Since your server can't `accept()` them all instantly, the OS keeps them in a <i>**"waiting room"**</i> (the backlog queue).
+
+    - **The Limit**: If the `backlog` is set to 10, and 11 people try to connect simultaneously, the 11th person will get an error (usually `ECONNREFUSED`) because the queue is full.
+
+### <i>What value should backlog be?</i>
+
+- Historically, this was small (like 5 or 10).
+
+- In modern high-performance servers, this is often set much higher (e.g., 128, 512, or even higher) to handle traffic spikes.
+
+- You can often use the constant SOMAXCONN (Socket Max Connections), which sets it to the maximum safe value allowed by your specific operating system (usually 128 or 4096 on Linux).
+
+### 🌊 Deep Dive: Passive vs. Active Sockets
+
+- This is a key concept that `listen()` changes.
+
+- **Active Socket**: When you first create a socket with `socket()`, the kernel assumes it will be used to initiate a connection (like a client calling `connect()`).
+
+- **Passive Socket**: When you call `listen()`, you flip a switch in the kernel. You are telling it, "This socket will never initiate a connection. It will only wait for others to connect to it."
+
+Once you call `listen()`, you can never call `connect()` on that socket. It is now dedicated permanently to waiting.
+
+### Return Values
+
+- `0`: Success. The socket is now in "listening" mode.
+
+- `-1`: Error. (Check errno).
+    - `EADDRINUSE`: You tried to listen on a port that another program is already using (common if you forgot to check `bind()` return value).
+
+    - `EBADF`: The `sockfd` is invalid.
+
+### Code Example: The Server Setup Sequence
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+int main() {
+    int sockfd;
+    struct sockaddr_in my_addr;
+
+    // 1. SOCKET
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    // 2. BIND (Setup the address)
+    my_addr.sin_family = AF_INET;
+    my_addr.sin_port = htons(8080);
+    my_addr.sin_addr.s_addr = INADDR_ANY;
+
+    if (bind(sockfd, (struct sockaddr *)&my_addr, sizeof(my_addr)) == -1) {
+        perror("bind failed");
+        exit(1);
+    }
+
+    // 3. LISTEN
+    // We allow a backlog of 20 pending connections
+    if (listen(sockfd, 20) == -1) {
+        perror("listen failed");
+        exit(1);
+    }
+
+    printf("Server is listening on port 8080...\n");
+
+    // 4. ACCEPT (Wait for the phone to ring)
+    // The program will pause here until a client connects
+
+    return 0;`
+}
+```
+## 🉑 accept()—“Thank you for calling port 3490.”
+
