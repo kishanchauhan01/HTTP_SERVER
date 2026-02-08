@@ -1,0 +1,11 @@
+BasedOnStyle: Google
+IndentWidth: 4
+UseTab: Never
+AllowShortIfStatementsOnASingleLine: true
+AllowShortLoopsOnASingleLine: true
+BreakBeforeBraces: Attach
+AlwaysBreakAfterDefinitionReturnType: None
+SpaceBeforeParens: ControlStatements
+PointerAlignment: Left
+BraceWrapping:
+  AfterFunction: false
