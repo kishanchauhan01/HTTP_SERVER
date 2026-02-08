@@ -731,3 +731,98 @@ int main()
 }
 ```
 
+## 🥰 send() and recv()—Talk to me, baby!
+
+- ***These two functions are the bread and butter of TCP communication***
+
+---
+### 1. `send()`: The Speaker
+---
+
+- **The signature:**
+
+```c
+int send(int sockfd, const void *msg, int len, int flags);
+```
+
+- **What it really does**: It **does not** send data directly to the network wire. Instead, it asks the Operating System: <i><u>**"Please copy these bytes from my program's memory into your Kernel Output Buffer."**</u></i>
+<br>
+- Once the data is in the Kernel Buffer, `send()` returns success. The OS then takes care of actually breaking it into TCP packets and transmitting them over the internet in the background.
+
+### The Arguments:
+
+1) `sockfd`: The socket file descriptor you want to send data to (the one returned by `accept()` or `connect()`).
+
+2) `msg`: A pointer to the data you want to send.
+
+3) `len`: The number of bytes in `msg` you want to send.
+
+4) `flags`: Usually set to `0`. (Advanced usage: `MSG_OOB` for urgent data, or `MSG_NOSIGNAL` to prevent crashes if the other side disappears).
+
+### The Return Value (The Trap):
+
+- **Success**: Returns the number of bytes actually sent (copied to the kernel).
+
+- **Error**: Returns `-1` (and sets `errno`).
+
+⚠️ Deep Dive: Partial Sends This is the most dangerous part of `send`. If you ask to send 1000 bytes, but the OS only has room in its buffer for 500 bytes, `send` will copy the first 500, return `500`, and leave the rest.
+
+- **You MUST check the return value.**
+
+- If `send` returns a number smaller than `len`, it is your responsibility to call `send` again with the remaining data.
+
+---
+### 2. recv(): The Listener
+---
+
+- **The signature:**
+
+```c
+int recv(int sockfd, void *buf, int len, int flags);
+```
+
+- **What it really does:** It checks the Kernel's **Input Buffer** for that socket.
+
+    - **If there is data:** It copies as much as fits into your `buf` and returns immediately.
+
+    - **If the buffer is empty:** It **BLOCKS** (pauses your program) and waits until at least 1 byte arrives.
+
+### The Arguments:
+
+1) `sockfd`: The socket to read from.
+
+2) `buf`: A pointer to a blank array (buffer) where the incoming data will be written.
+
+3) `len`: The maximum size of your buffer (so the OS doesn't overflow it).
+
+4) `flags`: Usually `0`. (Advanced: `MSG_PEEK` lets you look at the data without removing it from the buffer).
+
+### The Return Value (Critical Logic): This is the only way to know the state of the connection.
+
+- `> 0`: Success. Returns the number of bytes read.
+
+- `0`: **The Connection is Closed**. This means the other side called close() or disconnected. This is the "Hang Up" signal. You should close your socket too.
+
+- `-1`: Error. (e.g., Connection reset, network failure).
+
+---
+
+### Deep Concept: "Stream" vs "Packets"
+
+- TCP is a **Stream** protocol. This means it has no concept of "messages," only a continuous flow of bytes.
+
+**Scenario:**
+
+- Server sends: "Hello" (5 bytes).
+
+- Server sends: "World" (5 bytes).
+
+**What the Client might** `recv()`**:**
+
+- Option A: "Hello" then "World" (Two calls).
+
+- Option B: "HelloWorld" (One call - Packet Coalescing).
+
+- Option C: "Hel" then "loWorld" (Fragmentation).
+
+**The Rule:** You cannot assume that one `send()` equals one `recv()`. You must keep calling `recv()` until you have all the data you expect.
