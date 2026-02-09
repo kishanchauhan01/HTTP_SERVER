@@ -4,11 +4,11 @@
 
 The `server` should be
 
-- [ ] listens on port 8080
+- [x] listens on port 8080
 
-- [ ] accepts a connection
+- [x] accepts a connection
 
-- [ ] prints whatever client sends
+- [x] prints whatever client sends
 
 #### 🧩 Tasks
 
@@ -16,15 +16,15 @@ The `server` should be
 
 - Create a C++ program that:
 
-    - [ ] opens a socket
+    - [x] opens a socket
 
-    - [ ] binds to port 8080
+    - [x] binds to port 8080
 
     - [ ] listens forever
 
 **✅ Task 1.2**
 
-- [ ] Accept a client connection and print:
+- [x] Accept a client connection and print:
 
 ```bash
 Client connected!
@@ -32,4 +32,4 @@ Client connected!
 
 **✅ Task 1.3**
 
-- [ ] Read raw data from client and print it.
+- [x] Read raw data from client and print it.
