@@ -20,7 +20,7 @@ The `server` should be
 
     - [x] binds to port 8080
 
-    - [ ] listens forever
+    - [x] listens forever
 
 **✅ Task 1.2**
 
@@ -33,3 +33,12 @@ Client connected!
 **✅ Task 1.3**
 
 - [x] Read raw data from client and print it.
+
+---
+## 🧨 Final Task Checklist for TCP Server
+
+- [ ] Implement socket abstraction layer
+- [ ] Implement server lifecycle controller
+- [ ] Implement client connection handler
+- [ ] Add multi-client support
+- [ ] Add thread-per-client handling
