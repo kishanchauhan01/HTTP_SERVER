@@ -8,7 +8,7 @@
 
 #include "socket.hpp"
 
-enum serverStatus { STARTED, RUNNING, SLIPPING, STOPED };
+enum serverStatus { STARTED, RUNNING, SLIPPING, STOPPED };
 
 class Server {
    public:
@@ -24,7 +24,7 @@ class Server {
 
    private:
     int port;
-    serverStatus status = STOPED;  // by default server is stop
+    serverStatus status = STOPPED;  // by default server is stop
     std::unique_ptr<Socket> listner;
 };
 
